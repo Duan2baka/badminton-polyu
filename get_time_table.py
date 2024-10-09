@@ -9,18 +9,27 @@ import re
 
 #book_url = 'https://www40.polyu.edu.hk/starspossfbstud/secure/ui_make_book/make_book.do'
 
+class timeslot:
+    def __init__(self, date, start_time, end_time, fee):
+        self.date = date
+        self.start_time = start_time
+        self.end_time = end_time
+        self.fee = fee
+    def to_json(self):
+        return {'date': self.date,'start_time': self.start_time,'end_time': self.end_time,'fee': self.fee}
+
 def getBook_csrf(session):
     # print("start getting new csrf")  
     if DEBUG: responseRes = session.get(make_book_url,headers = login_header, proxies = proxies, verify=False)
     else: responseRes = session.get(make_book_url,headers = login_header)
     soup_Res = BeautifulSoup(responseRes.text,'lxml')
     data_Res = soup_Res.find_all('input',{'name':'CSRFToken'})
-    # print(soup_Res)
     CSRFToken = data_Res[0]['value']
     if responseRes.status_code == 200: print("Successfully get new CSRFToken for booking, CSRFToken = "+ CSRFToken)
     return CSRFToken
 
 def parse_string(input_str):
+    # print(input_str)
     confirmed = False # judge whether a reservation was made before at this day
     #print(input_str)
     #exit(0)
@@ -35,6 +44,7 @@ def parse_string(input_str):
     for i in it: title_pos.append(i.span()[1])
     title_pos.append(len(str))
     date_table = []
+    available_table = []
     pre = 0
     flag = False
     for i in title_pos: # divide data by court
@@ -63,9 +73,9 @@ def parse_string(input_str):
             availability = (re.search('\d',str[re.search('occupiedFacilityIds',str[pre1 : j]).span()[1] + pre1 : re.search('hasConfirmation',str[pre1 : j]).span()[0] + pre1]) == None)
 
             confirmed = True if str[re.search('hasConfirmation',str[pre1 : j]).span()[1] + pre1 + 2] == 't' else confirmed
-
             facility_table.append({'availability' : availability, 'fee' : fee, 'fromTime' : fromTime, 'endTime' : endTime})
-
+            if availability:
+                available_table.append(timeslot(court_name, fromTime, endTime, fee))
             pre1 = j
 
             #print(f"from: {fromTime} to: {endTime}")
@@ -76,16 +86,16 @@ def parse_string(input_str):
 
     #print(confirmed)
     
-    return date_table, confirmed
+    return date_table, available_table
 
 def get_time_table(session):
     time_table = []
     today = datetime.date.today()
-
+    ret = []
     CSRFToken = getBook_csrf(session) # get new CSRFToken
     if DEBUG: session.get(home_url, headers = get_header, proxies=proxies, verify=False, allow_redirects=False) # get ltpatoken2 cookie 
     else: session.get(home_url, headers = get_header, allow_redirects=False)
-    for i in range(0,7): # system allows user to book at most 7 days advance
+    for i in range(1,7): # system allows user to book at most 7 days advance
         postData = {
             "CSRFToken": CSRFToken,
             'fbUserId': fbUserId, #fbUserId seems to be able to get from html... I will optimize this later
@@ -104,16 +114,17 @@ def get_time_table(session):
 
         if responseRes.status_code == 200: print(f"Successfully get booking timetable on {(today + datetime.timedelta(days = i)).strftime('%d %b %Y')}!")
         #print_info(responseRes, 'book_res.html')
-
-        time_table.append(parse_string(responseRes.text)) # parse received data
+        tt, at = parse_string(responseRes.text)
+        ret = ret + at
+        time_table.append(tt) # parse received data
     
-    return time_table, CSRFToken
+    return time_table, CSRFToken, at
 
 
 if __name__ == "__main__": # DEBUG
     f=open('./result/book_res.html')
     str=f.read()
     #get_time_table()
-    parse_string(str)
+    data_table, csrf =parse_string(str)
     f.close()
     
