@@ -10,13 +10,13 @@ import re
 #book_url = 'https://www40.polyu.edu.hk/starspossfbstud/secure/ui_make_book/make_book.do'
 
 class timeslot:
-    def __init__(self, date, start_time, end_time, fee):
-        self.date = date
+    def __init__(self, court, start_time, end_time, fee):
+        self.court = court
         self.start_time = start_time
         self.end_time = end_time
         self.fee = fee
     def to_json(self):
-        return {'date': self.date,'start_time': self.start_time,'end_time': self.end_time,'fee': self.fee}
+        return {'court': self.court,'start_time': self.start_time,'end_time': self.end_time,'fee': self.fee}
 
 def getBook_csrf(session):
     # print("start getting new csrf")  
@@ -95,7 +95,7 @@ def get_time_table(session):
     CSRFToken = getBook_csrf(session) # get new CSRFToken
     if DEBUG: session.get(home_url, headers = get_header, proxies=proxies, verify=False, allow_redirects=False) # get ltpatoken2 cookie 
     else: session.get(home_url, headers = get_header, allow_redirects=False)
-    for i in range(1,7): # system allows user to book at most 7 days advance
+    for i in range(1, 8): # system allows user to book at most 7 days advance
         postData = {
             "CSRFToken": CSRFToken,
             'fbUserId': fbUserId, #fbUserId seems to be able to get from html... I will optimize this later
